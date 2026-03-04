@@ -19,18 +19,37 @@ class PylonRacingEnv(gym.Env):
         
         self.reset_client = self.node.create_client(Empty, '/reset_simulation')
         self.current_odom = None
-        
-        # Track if we have achieved flight in the current episode
         self.has_taken_off = False 
+        
+        # NEW: Velocity tracking variables
+        self.prev_pos = None
+        self.prev_time = None
+        self.current_vel = np.zeros(3)
 
     def _odom_cb(self, msg):
         self.current_odom = msg
+        
+        # Manually calculate velocity using finite difference
+        t = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
+        p = msg.pose.pose.position
+        curr_pos = np.array([p.x, p.y, p.z])
+        
+        if self.prev_pos is not None:
+            dt = t - self.prev_time
+            if dt > 0.0:
+                self.current_vel = (curr_pos - self.prev_pos) / dt
+        
+        self.prev_pos = curr_pos
+        self.prev_time = t
 
     def _get_obs(self):
-        if self.current_odom is None: return np.zeros(6, dtype=np.float32)
+        if self.current_odom is None: 
+            return np.zeros(6, dtype=np.float32)
         p = self.current_odom.pose.pose.position
-        v = self.current_odom.twist.twist.linear
-        return np.array([p.x, p.y, p.z, v.x, v.y, v.z], dtype=np.float32)
+        return np.array([
+            p.x, p.y, p.z, 
+            self.current_vel[0], self.current_vel[1], self.current_vel[2]
+        ], dtype=np.float32)
 
     def step(self, action):
         joy_msg = Joy()
@@ -46,21 +65,17 @@ class PylonRacingEnv(gym.Env):
         rclpy.spin_once(self.node, timeout_sec=0.1)
         obs = self._get_obs()
         
-        # Check if we've reached a safe flying altitude (e.g., 1.0 meters)
         if obs[2] > 1.0:
             self.has_taken_off = True
 
-        # Smarter crash logic
-        # It crashes if it falls through the map OR hits the ground after taking off
         done = bool((self.has_taken_off and obs[2] < 0.1) or (obs[2] < -0.5))
         
-        # Adjusted reward logic
         if done:
-            reward = -10.0 # Heavy penalty for crashing
+            reward = -10.0 
         elif self.has_taken_off:
-            reward = 1.0   # Reward for sustaining flight
+            reward = 1.0   
         else:
-            reward = 0.0   # Neutral while accelerating on the runway
+            reward = 0.0   
         
         return obs, reward, done, False, {}
 
@@ -72,7 +87,9 @@ class PylonRacingEnv(gym.Env):
         while self.current_odom is None:
             rclpy.spin_once(self.node)
             
-        # Reset the flight state for the new episode
         self.has_taken_off = False 
+        self.prev_pos = None
+        self.prev_time = None
+        self.current_vel = np.zeros(3)
         
         return self._get_obs(), {}

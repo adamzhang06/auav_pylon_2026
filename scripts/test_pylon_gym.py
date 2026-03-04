@@ -11,14 +11,13 @@ def main():
     print("Testing Reset...")
     obs, info = env.reset()
     
-    # ... (setup code remains the same) ...
     target_alt = 7.0
     print(f"Initiating Takeoff Sequence to {target_alt}m...")
 
-    # NEW: Variable to hold our current elevator state so we can ramp it smoothly
+    # Variable to hold our current elevator state so we can ramp it smoothly
     current_elevator = -0.02 
 
-    for i in range(200):
+    for i in range(1000):
         current_alt = obs[2]
         current_speed = np.sqrt(obs[3]**2 + obs[4]**2 + obs[5]**2)
 
