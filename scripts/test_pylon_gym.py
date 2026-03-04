@@ -11,40 +11,40 @@ def main():
     print("Testing Reset...")
     obs, info = env.reset()
     
+    # ... (setup code remains the same) ...
     target_alt = 7.0
     print(f"Initiating Takeoff Sequence to {target_alt}m...")
 
-    # Run for 200 steps (approx 20 seconds of simulation time)
+    # NEW: Variable to hold our current elevator state so we can ramp it smoothly
+    current_elevator = -0.02 
+
     for i in range(200):
-        # Extract data from observation: [x, y, z, vx, vy, vz]
         current_alt = obs[2]
         current_speed = np.sqrt(obs[3]**2 + obs[4]**2 + obs[5]**2)
 
-        # Default controls: stay straight, full power
         aileron = 0.0
         rudder = 0.0
         throttle = 1.0 
         
-        # Hardcoded Takeoff Policy (mimicking the sample script)
+        # Smoother Takeoff Policy
         if current_speed < 0.5:
-            # Keep tail down while accelerating
-            elevator = -0.02
+            current_elevator = -0.02 # Tail down
         elif current_alt < target_alt:
-            # Pitch up to climb
-            elevator = 0.15
+            # Let it gain some speed before pitching up
+            if current_speed > 4.0:
+                # Smoothly ramp up the elevator by 0.01 per step, capping at 0.12
+                current_elevator = min(0.12, current_elevator + 0.01)
+            else:
+                current_elevator = 0.0 # Stay flat and accelerate
         else:
-            # Level off once we hit 7 meters
-            elevator = 0.0
-            throttle = 0.6 # Cruise power
+            current_elevator = 0.0
+            throttle = 0.6 # Cruise
 
-        # Construct the action array: [Aileron, Elevator, Throttle, Rudder]
-        action = np.array([aileron, elevator, throttle, rudder], dtype=np.float32)
-        
-        # Step the environment
+        action = np.array([aileron, current_elevator, throttle, rudder], dtype=np.float32)
         obs, reward, terminated, truncated, info = env.step(action)
         
         if i % 10 == 0:
-            print(f"Step {i} | Speed: {current_speed:.2f} m/s | Alt: {current_alt:.2f} m | Elev: {elevator}")
+            print(f"Step {i} | Speed: {current_speed:.2f} m/s | Alt: {current_alt:.2f} m | Elev: {current_elevator:.3f}")
 
         if terminated:
             print("Crashed! Resetting...")

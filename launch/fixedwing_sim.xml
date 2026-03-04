@@ -3,7 +3,7 @@
     <arg name="score" default="false"/>
     <arg name="mode" default="gym"/>
 
-    <node pkg="cyecca" exec="fixedwing_sim.py" output="screen"/>
+    <node pkg="cyecca" exec="fixedwing_sim.py" output="screen" respawn="true"/>
 
     <node pkg="auav_pylon_2026" 
           exec="sim_tecs_ros_xtrack.py" 
