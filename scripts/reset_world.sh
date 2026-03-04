@@ -1,1 +1,0 @@
-pkill -f fixedwing_sim.py
