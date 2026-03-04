@@ -1,7 +1,7 @@
 <launch>
     <arg name="use_joystick" default="false"/>
     <arg name="score" default="false"/>
-    <arg name="mode" default="manual"/>
+    <arg name="mode" default="gym"/>
 
     <node pkg="cyecca" exec="fixedwing_sim.py" output="screen"/>
 
