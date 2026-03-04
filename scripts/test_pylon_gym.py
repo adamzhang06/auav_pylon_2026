@@ -21,6 +21,7 @@ def main():
         # Loop forever until Ctrl+C
         while rclpy.ok():
             current_alt = obs[2]
+            vz = obs[5] # NEW: Extract vertical velocity for damping
             current_speed = np.sqrt(obs[3]**2 + obs[4]**2 + obs[5]**2)
 
             aileron = 0.0
@@ -31,27 +32,25 @@ def main():
             
             # 2. Flight Phase Logic
             if current_speed < 4.0:
-                # Ground roll: tail down, full power
                 target_elevator = -0.02
                 throttle = 1.0
             elif current_speed >= 4.0 and current_alt < 2.0:
-                # Initial climb: pitch up, full power
                 target_elevator = 0.12
                 throttle = 1.0
             else:
-                # Airborne: Proportional control for altitude
-                # Gain is 0.05. Clip max/min throw so it doesn't loop or dive.
-                target_elevator = np.clip(alt_error * 0.05, -0.10, 0.15)
+                # PD Controller (P = alt_error * 0.08, D = vz * 0.1)
+                # The D-term pushes the elevator the OPPOSITE way if it's climbing/falling too fast
+                target_elevator = np.clip((alt_error * 0.08) - (vz * 0.1), -0.25, 0.15)
                 
-                # Throttle management based on error
+                # Smarter throttle management
                 if alt_error > 1.0:
-                    throttle = 0.8  # Need to climb
+                    throttle = 0.8  
                 elif alt_error < -1.0:
-                    throttle = 0.3  # Need to descend
+                    throttle = 0.1  # Cut power completely to stop the infinite climb
                 else:
-                    throttle = 0.6  # Cruise
+                    throttle = 0.45 # Lower cruise power for the Cub
 
-            # 3. Smooth the actuator input (max movement of 0.01 per step)
+            # 3. Smooth the actuator input
             current_elevator += np.clip(target_elevator - current_elevator, -0.01, 0.01)
 
             action = np.array([aileron, current_elevator, throttle, rudder], dtype=np.float32)
